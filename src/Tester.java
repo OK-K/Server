@@ -49,19 +49,4 @@ public class Tester {
             }
 
     }
-
-    private static void tryDiagonal2(int[][] a){
-        boolean canMakeAShot = false;
-        int j=1;
-            for (int i = 1; i <= 10; i++) {
-                j++;
-                if (j == 4) j = 0;
-                int k = 1;
-                do {
-                    a[i][k * 4 - j % 4] = 3;
-                    k++;
-
-                } while (k * 4 - j % 4 <= 10);
-            }
-    }
 }
