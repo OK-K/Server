@@ -50,7 +50,7 @@ public class Tester {
 
     }
 
-    private static void tryDiagonal3(int[][] a){
+    private static void tryDiagonal2(int[][] a){
         boolean canMakeAShot = false;
         int j=1;
             for (int i = 1; i <= 10; i++) {
