@@ -30,7 +30,7 @@ public class Tester {
         System.out.println(res);
     }
 
-    private static void tryDiagonal4(int[][] a, boolean firstDiag){
+    private static void strange(int[][] a, boolean firstDiag){
         boolean canMakeAShot = false;
         int j=0;
         if(firstDiag)
