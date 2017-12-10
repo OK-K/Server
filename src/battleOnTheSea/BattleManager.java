@@ -10,7 +10,30 @@ import java.util.ArrayList;
 import java.util.Random;
 
 public class BattleManager {
-    private static Player[] players = new Player[2];
+    private Player[] players = new Player[2];
+
+    public BattleManager(){
+        players[0] = new AI(0);
+        players[1] = new AI(3);
+    }
+    public BattleManager(String login, int level){
+        players[0] = new Human(login);
+        players[1] = new AI(level);
+    }
+
+    public BattleManager(String login1, String login2){
+        players[0] = new Human(login1);
+        players[1] = new Human(login2);
+    }
+
+    public BattleManager(Player player1, Player player2){
+        players[0] = player1;
+        players[1] = player2;
+    }
+
+    public Player[] getPlayers() {
+        return players;
+    }
 
     private static void shipIsDead(Player player){
         player.myShipIsDead();
@@ -158,39 +181,15 @@ public class BattleManager {
         return false;
     }
 
-    public static void prepareTheGame(String[] logins){
-        if (logins==null){
-            AvA();
-            return;
-        }
-        if(logins[1].length()>1)
-            PvP(logins[0], logins[1]);
-        else
-            AvP(logins[0],Integer.parseInt(logins[1]));
-    }
 
-    private static void AvP(String login, int level){
-        players[0] = new Human(login);
-        players[1] = new AI(level);
-    }
 
-    private static void PvP(String login1, String login2){
-        players[0] = new Human(login1);
-        players[1] = new Human(login2);
-    }
-
-    private static void AvA(){
-        players[0] = new AI(0);
-        players[1] = new AI(3);
-    }
-
-    private static boolean isFinished(Player[] players){
+    private boolean isFinished(){
         if (players[0].getCountOfShips()==0 || players[1].getCountOfShips()==0)
             return true;
         return false;
     }
 
-    public static int playTheGame(){
+    public int playTheGame(){
         Random rand = new Random();
         int turn = rand.nextInt(2);
         int[] count= new int[2];
@@ -207,10 +206,10 @@ public class BattleManager {
                     //System.out.println(players[turn].getLogin()+" утопил корабль на "+p);
                 }
 
-            }while (players[1 - turn].ships()[p.x][p.y]!=-5 && !isFinished(players));
+            }while (players[1 - turn].ships()[p.x][p.y]!=-5 && !isFinished());
 
             turn = 1 - turn;
-        }while (!isFinished(players));
+        }while (!isFinished());
         turn = 1 - turn;
         //System.out.println(players[turn].getLogin()+" выиграл на ходе "+count[turn]);
         return turn;
@@ -218,11 +217,11 @@ public class BattleManager {
 
     }
 
-    public static String showSituation() {
+    public String showSituation() {
         return players[0]+"\n"+players[1];
     }
 
-    public static void testGame(){
+    public void testGame(){
         Player[] players = {new AI(2), new Human("Alyosha")};
         Point p;
         System.out.println(players[1]);
@@ -232,6 +231,6 @@ public class BattleManager {
                 shipIsDead(players[1]);
             System.out.println(p.toString()+players[1]);
 
-        }while (!BattleManager.isFinished(players));
+        }while (!isFinished());
     }
 }

@@ -10,9 +10,9 @@ import java.awt.*;
 public class Tester {
     public static void main(String[] args){
         int count = 0;
-        for(int i=0; i<10000; i++) {
-            BattleManager.prepareTheGame(null);
-            if (BattleManager.playTheGame() == 1) count++;
+        for(int i=0; i<100000; i++) {
+            BattleManager bm = new BattleManager();
+            if (bm.playTheGame() == 1) count++;
             //System.out.println(BattleManager.showSituation());
         }
         System.out.println(count);
