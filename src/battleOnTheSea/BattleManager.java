@@ -12,29 +12,31 @@ import java.util.Random;
 public class BattleManager {
     private Player[] players = new Player[2];
 
+    // конструктор по умолчанию для игры двух ИИ
     public BattleManager(){
         players[0] = new AI(0);
         players[1] = new AI(3);
     }
+    // конструктор для игры человека с ИИ
     public BattleManager(String login, int level){
         players[0] = new Human(login);
         players[1] = new AI(level);
     }
-
+    // конструктор для игры человек-человек
     public BattleManager(String login1, String login2){
         players[0] = new Human(login1);
         players[1] = new Human(login2);
     }
-
+    // универсальный конструктор
     public BattleManager(Player player1, Player player2){
         players[0] = player1;
         players[1] = player2;
     }
-
+    // геттер для игроков
     public Player[] getPlayers() {
         return players;
     }
-
+    // метод запускается, когда checkTheField возвращает true
     private static void shipIsDead(Player player){
         player.myShipIsDead();
         int[][] ships = player.ships();
@@ -53,7 +55,7 @@ public class BattleManager {
                 }
             }
     }
-
+    // метод проверки сделанного выстрела на предмет убийства
     private static boolean checkTheField(Point shot, Player player){
         player.iWasShot(shot);
         int[][] ships = player.ships();
@@ -180,15 +182,13 @@ public class BattleManager {
 
         return false;
     }
-
-
-
+    // признак конца игры
     private boolean isFinished(){
         if (players[0].getCountOfShips()==0 || players[1].getCountOfShips()==0)
             return true;
         return false;
     }
-
+    // процесс игры, реализованный на массиве интерфейсов
     public int playTheGame(){
         Random rand = new Random();
         int turn = rand.nextInt(2);
@@ -216,21 +216,9 @@ public class BattleManager {
 
 
     }
-
+    // вывод на экран текущей ситуации
     public String showSituation() {
         return players[0]+"\n"+players[1];
     }
 
-    public void testGame(){
-        Player[] players = {new AI(2), new Human("Alyosha")};
-        Point p;
-        System.out.println(players[1]);
-        do{
-            p = players[0].makeAShot(players[1]);
-            if(checkTheField(p, players[1]))
-                shipIsDead(players[1]);
-            System.out.println(p.toString()+players[1]);
-
-        }while (!isFinished());
-    }
 }

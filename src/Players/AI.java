@@ -330,7 +330,7 @@ public class AI implements Player {
 
     public void iWasShot(Point p){
         if (myShips[p.x][p.y]<1) throw new IllegalArgumentException("Почему вы стреляете по уже стреляной клетке?");
-        else myShips[p.x][p.y] = -1*myShips[p.x][p.y];
+        else myShips[p.x][p.y] = -myShips[p.x][p.y];
     }
 
     @Override
