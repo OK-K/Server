@@ -25,7 +25,7 @@ public class Server {
             put("json", "application/json");
         }
     };
-    private static String contentPath = "D://seaBattleServer";
+    public static String contentPath = "D://seaBattleServer";
     private static ArrayList<String> usersName = new ArrayList<>();
     private static ArrayList<BattleManager> games = new ArrayList<>();
 
@@ -125,21 +125,31 @@ public class Server {
             }
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/sendComplexity") == 0)
             {
-                InputStream inputStream = exchange.getRequestBody();
-                String inputStreamString = new Scanner(inputStream,"UTF-8").useDelimiter("\\A").next();
+                try {
+                    InputStream inputStream = exchange.getRequestBody();
+                    String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
 
-                int index = inputStreamString.lastIndexOf("level");
-                int lvl = Integer.parseInt(Parse.getValue(inputStreamString,index));
+                    int index = inputStreamString.lastIndexOf("level");
+                    int lvl = Integer.parseInt(Parse.getValue(inputStreamString, index));
 
-                index = inputStreamString.lastIndexOf("login");
-                String login = Parse.getValue(inputStreamString,index);
+                    index = inputStreamString.lastIndexOf("login");
+                    String login = Parse.getValue(inputStreamString, index);
 
-                games.add(new BattleManager(login,lvl));
+                    games.add(new BattleManager(login, lvl));
 
-                int[][] shipPlayer = games.get(games.size() - 1).getPlayers()[0].getShipsForClient();
-                int[][] shipAI = games.get(games.size() - 1).getPlayers()[1].getShipsForClient();
+                    int[][] shipPlayer = games.get(games.size() - 1).getPlayers()[0].getShipsForClient();
+                    int[][] shipAI = games.get(games.size() - 1).getPlayers()[1].getShipsForClient();
 
+                    Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(games.size() - 1).getPlayers()[1].getLogin());
+                    String response = "1";
+                    sendResponce(exchange,response.getBytes());
 
+                }
+                catch (IOException e)
+                {
+                    String response = "wrongWriteFile";
+                    sendResponce(exchange,response.getBytes());
+                }
 
                 //sendResponce(exchange,response.getBytes());
                 return;
