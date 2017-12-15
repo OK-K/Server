@@ -14,15 +14,15 @@ public interface Player {
 
     Point makeAShot(Player enemy);// выстрел по ПРОТИВНИКУ
 
-    int[][] ships();
+    int[][] ships();// получить игровое поле игрока
 
-    void loadShips(int[][] ships);
+    void loadShips(int[][] ships);// установить игровое поле
 
-    void myShipIsDead();
+    void myShipIsDead();// уменьшает количеств кораблей, чтобы определить момент окончания игры
 
-    int getCountOfShips();
+    int getCountOfShips();// получение количества кораблей
 
-    void arrangeShipsRandom();
+    void arrangeShipsRandom();// расставить случайно корабли
 
-    int[][] getShipsForClient();
+    int[][] getShipsForClient();// выдача Дмитрию модернизированной матрицы
 }

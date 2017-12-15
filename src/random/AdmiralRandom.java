@@ -16,7 +16,7 @@ public class AdmiralRandom {
                     myShips[i][j] = 0;
             }
     }
-
+    // простое рандомное расположение кораблей
     public int[][] randomArrangement(){
         for (int i=0; i<12; i++)
             for (int j=0; j<12; j++) {
@@ -38,7 +38,7 @@ public class AdmiralRandom {
             }
         return myShips;
     }
-
+    // специальное расположение кораблей для более интеллектуальных ИИ
     public int[][] specialArrangement(){
         int corner = 1 + randomCoordinate.nextInt(4);
         boolean v = randomCoordinate.nextBoolean();
@@ -118,7 +118,7 @@ public class AdmiralRandom {
 
         return myShips;
     }
-
+    // первый вариант расстановки больших кораблей
     private void fillBigShips1(int x, int y, int dx, int dy, int sdx, int sdy){
         for(int i=0; i<4; i++){
             for(int j=0;j<10; j++){
@@ -130,7 +130,7 @@ public class AdmiralRandom {
             }
         }
     }
-
+    // второй вариант расстановки
     private void fillBigShips2(int x, int y, int dx, int dy, int sdx, int sdy){
         for(int i=0; i<4; i++){
             for(int j=0;j<10; j++){
@@ -146,7 +146,7 @@ public class AdmiralRandom {
         }
 
     }
-
+    // случайно поставить 4-палубник
     private void arrange4(){
         int x= 1+randomCoordinate.nextInt(10);
         int y= 1+randomCoordinate.nextInt(10);
@@ -180,7 +180,7 @@ public class AdmiralRandom {
 
         fill(4);
     }
-
+    // случайно поставить 1-палубник
     private void arrange1(){
         int x;
         int y;
@@ -192,7 +192,7 @@ public class AdmiralRandom {
 
         fill(1);
     }
-
+    // случайно поставить 3-палубник
     private void arrange3(){
         int x;
         int y;
@@ -229,7 +229,7 @@ public class AdmiralRandom {
         fill(3);
 
     }
-
+    // случайно поставить 2-палубник
     private void arrange2(){
         int x;
         int y;
@@ -252,7 +252,7 @@ public class AdmiralRandom {
             myShips[x][y+1] = 2;
         fill(2);
     }
-
+    // заполнить оставшиеся поля
     private void fill(int num){
         for (int i=1; i<=10; i++)
             for(int j=1; j<=10;j++) {
