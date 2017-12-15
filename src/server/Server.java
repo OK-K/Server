@@ -19,10 +19,13 @@ public class Server {
             put("html", "text/html");
             put("css", "text/css");
             put("png", "image/png");
+            put("jpg", "image/jpg");
             put("gif", "image/gif");
             put("js", "text/javascript");
             put("ico", "image/x-icon");
             put("json", "application/json");
+            put("ttf", "application/x-font-ttf");
+
         }
     };
     public static String contentPath = "D://seaBattleServer";
