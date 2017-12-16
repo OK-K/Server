@@ -59,7 +59,16 @@ public class AI implements Player {
 
     @Override
     public void loadShips(int[][] ships) {
-        myShips=ships;
+        if (ships[0].length == 10){
+            for (int i=1; i<=10; i++)
+                for (int j=1; j<=10; j++) {
+                    myShips[i][j] = ships[i-1][j-1];
+                }
+        }
+        else if (ships[0].length == 12){
+            myShips = ships;
+        }
+        else throw new IllegalArgumentException("Размеры матрицы не соответствуют размерам поля");
     }
 
     @Override
