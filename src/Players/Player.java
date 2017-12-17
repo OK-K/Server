@@ -14,6 +14,8 @@ public interface Player {
 
     Point makeAShot(Player enemy);// выстрел по ПРОТИВНИКУ
 
+    Point makeAShot(Point p, Player enemy);// выстрел по ПРОТИВНИКУ
+
     int[][] ships();// получить игровое поле игрока
 
     void loadShips(int[][] ships);// установить игровое поле

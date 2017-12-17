@@ -368,6 +368,13 @@ public class AI implements Player {
     }
 
     @Override
+    public Point makeAShot(Point p, Player enemy) {
+        if (p==null)
+            makeAShot(enemy);
+        return p;
+    }
+
+    @Override
     public String getLogin() {
         return login;
     }
