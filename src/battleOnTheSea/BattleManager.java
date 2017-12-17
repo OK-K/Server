@@ -11,30 +11,47 @@ import java.util.Random;
 
 public class BattleManager {
     private Player[] players = new Player[2];
+    private int turn = 0;
 
     // конструктор по умолчанию для игры двух ИИ
     public BattleManager(){
+        Random rand = new Random();
+        turn = rand.nextInt(2);
         players[0] = new AI(0);
         players[1] = new AI(3);
     }
     // конструктор для игры человека с ИИ
     public BattleManager(String login, int level){
+        Random rand = new Random();
+        turn = rand.nextInt(2);
         players[0] = new Human(login);
         players[1] = new AI(level);
     }
     // конструктор для игры человек-человек
     public BattleManager(String login1, String login2){
+        Random rand = new Random();
+        turn = rand.nextInt(2);
         players[0] = new Human(login1);
         players[1] = new Human(login2);
     }
     // универсальный конструктор
     public BattleManager(Player player1, Player player2){
+        Random rand = new Random();
+        turn = rand.nextInt(2);
         players[0] = player1;
         players[1] = player2;
     }
     // геттер для игроков
     public Player[] getPlayers() {
         return players;
+    }
+    // Получить игрока, делающего в данный момент ход
+    public Player getCurrentPlayer() {
+        return players[turn];
+    }
+    // получить его противника
+    public Player getCurrentEnemy() {
+        return players[1-turn];
     }
     // метод запускается, когда checkTheField возвращает true
     private static void shipIsDead(Player player){
@@ -188,10 +205,14 @@ public class BattleManager {
             return true;
         return false;
     }
+    // ход переходит к другому игроку
+    public void nextTurn(){
+        turn = 1-turn;
+    }
     // процесс игры, реализованный на массиве интерфейсов
     public int playTheGame(){
         Random rand = new Random();
-        int turn = rand.nextInt(2);
+        turn = rand.nextInt(2);
         int[] count= new int[2];
         Point p;
         do{
@@ -203,15 +224,13 @@ public class BattleManager {
                 boolean isDead = checkTheField(p, players[1 - turn]);
                 if (isDead) {
                     shipIsDead(players[1 - turn]);
-                    //System.out.println(players[turn].getLogin()+" утопил корабль на "+p);
                 }
 
             }while (players[1 - turn].ships()[p.x][p.y]!=-5 && !isFinished());
 
-            turn = 1 - turn;
+            nextTurn();
         }while (!isFinished());
-        turn = 1 - turn;
-        //System.out.println(players[turn].getLogin()+" выиграл на ходе "+count[turn]);
+        nextTurn();
         return turn;
 
 

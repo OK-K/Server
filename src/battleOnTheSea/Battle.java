@@ -5,6 +5,16 @@ import Players.Player;
 import java.awt.*;
 
 public class Battle {
+    public static boolean nextTurn(BattleManager bm, Point madeShot){
+        boolean isDead = checkTheField(madeShot, bm.getCurrentEnemy());
+        if(isDead)
+            shipIsDead(bm.getCurrentEnemy());
+        else
+            bm.nextTurn();
+
+        return  isFinished(bm);
+    }
+
     private static void shipIsDead(Player player){
         player.myShipIsDead();
         int[][] ships = player.ships();
@@ -151,8 +161,8 @@ public class Battle {
         return false;
     }
     // признак конца игры
-    private static boolean isFinished(Player[] players){
-        if (players[0].getCountOfShips()==0 || players[1].getCountOfShips()==0)
+    private static boolean isFinished(BattleManager bm){
+        if (bm.getPlayers()[0].getCountOfShips()==0 || bm.getPlayers()[1].getCountOfShips()==0)
             return true;
         return false;
     }
