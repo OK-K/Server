@@ -5,6 +5,11 @@ import Players.Player;
 import java.awt.*;
 
 public class Battle {
+    /*
+    do{}
+    while(nextTurn(bm, bm.getCurrentPlayer().makeAShot(p,bm.getCurrentEnemy())));
+    *
+    * */
     public static boolean nextTurn(BattleManager bm, Point madeShot){
         boolean isDead = checkTheField(madeShot, bm.getCurrentEnemy());
         if(isDead)
@@ -12,7 +17,7 @@ public class Battle {
         else
             bm.nextTurn();
 
-        return  isFinished(bm);
+        return  !isFinished(bm);
     }
 
     private static void shipIsDead(Player player){

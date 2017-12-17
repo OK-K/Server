@@ -45,7 +45,6 @@ public class Human implements Player {
 
     @Override
     public Point makeAShot(Point p, Player enemy) {
-        enemy.iWasShot(p);
         return p;
     }
 

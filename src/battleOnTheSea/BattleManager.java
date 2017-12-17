@@ -45,6 +45,10 @@ public class BattleManager {
     public Player[] getPlayers() {
         return players;
     }
+    // геттер для хода
+    public int getTurn() {
+        return turn;
+    }
     // Получить игрока, делающего в данный момент ход
     public Player getCurrentPlayer() {
         return players[turn];
