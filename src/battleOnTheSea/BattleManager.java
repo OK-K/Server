@@ -23,7 +23,7 @@ public class BattleManager {
     // конструктор для игры человека с ИИ
     public BattleManager(String login, int level){
         Random rand = new Random();
-        turn = rand.nextInt(2);
+        turn = 0;
         players[0] = new Human(login);
         players[1] = new AI(level);
     }

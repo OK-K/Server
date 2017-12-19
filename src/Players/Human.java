@@ -1,7 +1,7 @@
 package Players;
 
-import Players.Player;
 import random.AdmiralRandom;
+
 import java.awt.*;
 
 public class Human implements Player {
@@ -37,11 +37,13 @@ public class Human implements Player {
         if (myShips[p.x][p.y]<1) throw new IllegalArgumentException("Почему вы стреляете по уже стреляной клетке?");
         else myShips[p.x][p.y] = -myShips[p.x][p.y];
     }
-//-------------------------------------------------------------------------------------
-    @Override//предполагается наличие кода, который берёт сделанную
-    public Point makeAShot(Player enemy) {
+
+    @Override
+    public Point makeAShot(Player enemy){
         return null;
     }
+
+//-------------------------------------------------------------------------------------
 
     @Override
     public Point makeAShot(Point p, Player enemy) {
@@ -104,4 +106,5 @@ public class Human implements Player {
         }
         return res;
     }
+
 }

@@ -99,6 +99,7 @@ public class AI implements Player {
         return send;
     }
 
+
     private Point easyShot(Player enemy){
         int[][] enemyShips = enemy.ships();
         int x = 0;
@@ -369,9 +370,7 @@ public class AI implements Player {
 
     @Override
     public Point makeAShot(Point p, Player enemy) {
-        if (p==null)
             return makeAShot(enemy);
-        return p;
     }
 
     @Override

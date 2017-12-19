@@ -27,4 +27,5 @@ public interface Player {
     void arrangeShipsRandom();// расставить случайно корабли
 
     int[][] getShipsForClient();// выдача Дмитрию модернизированной матрицы
+
 }

@@ -1,8 +1,10 @@
 package server;
 
+import battleOnTheSea.Battle;
 import battleOnTheSea.BattleManager;
 import com.sun.net.httpserver.*;
 
+import java.awt.*;
 import java.io.*;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -30,7 +32,9 @@ public class Server {
     };
     public static String contentPath = "D://seaBattleServer";
     private static ArrayList<String> usersName = new ArrayList<>();
-    private static ArrayList<BattleManager> games = new ArrayList<>();
+    public static ArrayList<BattleManager> games = new ArrayList<>();
+    public static HttpServer server;
+    public static boolean test = false;
 
     public static void main(String[] args) throws IOException {
         createMainMenu();
@@ -51,28 +55,29 @@ public class Server {
                 String ip = startServer();
                 System.out.println("Server successfully started");
                 System.out.println("server ip adress: " + ip);
+                createMainMenu();
             }
             case "stop":
             {
-
+                server.stop(3);
+                createMainMenu();
             }
         }
     }
 
     public static String startServer() throws IOException {
         String ip_adress = Inet4Address.getLocalHost().getHostAddress();
-        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getByName(ip_adress), 80), 10);
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getByName(ip_adress), 80), 10);
         HttpContext context = server.createContext("/", new EchoHandler());
         server.setExecutor(null);
         server.start();
         return ip_adress;
     }
 
-    public static void processingRequest(HttpExchange exchange) throws IOException {
+    public static void processingRequest(HttpExchange exchange) throws IOException, InterruptedException {
 
         int start = 0;
         String url = exchange.getRequestURI().toString();
-        //Headers head = exchange.getRequestHeaders();
         String httpMethod = exchange.getRequestMethod();
 
         if (httpMethod.compareTo("GET") == 0 && url.compareTo("/") == 0)
@@ -126,6 +131,8 @@ public class Server {
                 sendResponce(exchange,response.getBytes());
                 return;
             }
+
+            //принимаем запрос, где пользователь выбирает среднюю сложность
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/sendComplexity") == 0)
             {
                 try {
@@ -138,25 +145,179 @@ public class Server {
                     index = inputStreamString.lastIndexOf("login");
                     String login = Parse.getValue(inputStreamString, index);
 
-                    games.add(new BattleManager(login, lvl));
+                    games.add(new BattleManager(login, lvl)); //создаем новую игру с компьютером с соответсвующим уровнем сложности
 
+                    //запись кораблей в матрицы
                     int[][] shipPlayer = games.get(games.size() - 1).getPlayers()[0].getShipsForClient();
                     int[][] shipAI = games.get(games.size() - 1).getPlayers()[1].getShipsForClient();
 
+                    //запись двух матриц с кораблями в json файл
                     Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(games.size() - 1).getPlayers()[1].getLogin());
                     String response = "1";
                     sendResponce(exchange,response.getBytes());
 
                 }
+                //ловим исключение, если произошла ошибка записи в json
                 catch (IOException e)
                 {
                     String response = "wrongWriteFile";
                     sendResponce(exchange,response.getBytes());
                 }
-
-                //sendResponce(exchange,response.getBytes());
                 return;
             }
+
+            //запрос о начале игры с ИИ
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/runGame") == 0)
+            {
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                for (int i = 0; i < games.size(); i++)
+                {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0)
+                    {
+                        String response = "1";
+                        sendResponce(exchange,response.getBytes());
+                        //games.get(i).playTheGame();
+                        break;
+                    }
+                }
+
+
+            }
+
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/sendShotAI") == 0)
+            {
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                index = inputStreamString.lastIndexOf("shot");
+                String shot = Parse.getValue(inputStreamString,index);
+                int ind = 0;
+
+                for (int i = 0; i < games.size(); i++)
+                {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0)
+                    {
+                        if(Battle.isFinished(games.get(i)) == 1)
+                        {
+                            String response = "lose=!one!";
+                            games.remove(i);
+                            sendResponce(exchange, response.getBytes());
+                            return;
+                        }
+
+                        if(Battle.isFinished(games.get(i)) == 2)
+                        {
+                            String response = "lose=!two!";
+                            games.remove(i);
+                            sendResponce(exchange, response.getBytes());
+                            return;
+                        }
+                        int[][] shipAI;
+                        int[][] shipPlayer;
+                        int count = 0;
+
+                        shipAI = games.get(i).getPlayers()[1].getShipsForClient();
+                        count = checkTurn(shipAI);
+
+                        Point p;
+                        ind = i;
+                        p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot),games.get(i).getCurrentEnemy());
+
+                        boolean isDead = Battle.checkTheField(p,games.get(i).getCurrentEnemy());
+
+                        if (isDead) {
+                            Battle.shipIsDead(games.get(i).getCurrentEnemy());
+                        }
+
+                        int newCount = 0;
+                        shipAI = games.get(i).getPlayers()[1].getShipsForClient();
+                        newCount = checkTurn(shipAI);
+
+
+                        //если пользователь попал, то он продолжает стрелять
+                        if (newCount > count && games.get(i).getTurn() == 0)
+                        {
+                            //запись кораблей в матрицы
+                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
+                            shipAI = games.get(ind).getPlayers()[1].getShipsForClient();
+
+                            //запись двух матриц с кораблями в json файл
+                            Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(ind).getPlayers()[1].getLogin());
+                            String response = "1";
+                            sendResponce(exchange, response.getBytes());
+                            return;
+                        } else
+                        {
+                            games.get(i).nextTurn();
+                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
+                            count = checkTurn(shipPlayer);
+                            p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot), games.get(i).getCurrentEnemy());
+
+                            isDead = Battle.checkTheField(p, games.get(i).getCurrentEnemy());
+
+                            if (isDead) {
+                                Battle.shipIsDead(games.get(i).getCurrentEnemy());
+                            }
+
+                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
+                            newCount = checkTurn(shipPlayer);
+                        }
+                        if (newCount > count && games.get(i).getTurn() == 1)
+                        {
+                            String shots = "";
+                            int countShots = 0;
+
+                            while (newCount != count)
+                            {
+                                count = newCount;
+
+                                p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot), games.get(i).getCurrentEnemy());
+                                countShots++;
+                                shots += "x" + countShots + "=!" + p.x + "!";
+                                shots += "y" + countShots + "=!" + p.y + "!";
+                                isDead = Battle.checkTheField(p, games.get(i).getCurrentEnemy());
+
+                                if (isDead) {
+                                    Battle.shipIsDead(games.get(i).getCurrentEnemy());
+                                }
+
+                                shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
+                                newCount = checkTurn(shipPlayer);
+
+                            }
+                            games.get(i).nextTurn();
+                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
+                            shipAI = games.get(ind).getPlayers()[1].getShipsForClient();
+
+                            //запись двух матриц с кораблями в json файл
+                            Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(ind).getPlayers()[1].getLogin());
+                            String response = "1";
+                            sendResponce(exchange, response.getBytes());
+                            return;
+                        }
+                        else {
+                            games.get(i).nextTurn();
+                            //запись кораблей в матрицы
+                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
+                            shipAI = games.get(ind).getPlayers()[1].getShipsForClient();
+
+                            //запись двух матриц с кораблями в json файл
+                            Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(ind).getPlayers()[1].getLogin());
+                            String response = "1";
+                            sendResponce(exchange, response.getBytes());
+                        }
+                    }
+                }
+            }
+
         }
 
     }
@@ -165,7 +326,11 @@ public class Server {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
 
-            processingRequest(exchange);
+            try {
+                processingRequest(exchange);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -174,6 +339,21 @@ public class Server {
         OutputStream os = exchange.getResponseBody();
         os.write(buffer);
         os.close();
+    }
+
+    private static int checkTurn(int[][] ships)
+    {
+        int count = 0;
+
+        for (int q = 0; q < ships.length; q++)
+        {
+            for (int j = 0; j < ships[q].length; j++)
+            {
+                if (ships[q][j] == -1 || ships[q][j] == -2 || ships[q][j] == -3 || ships[q][j] == -4 || ships[q][j] == 0)
+                    count++;
+            }
+        }
+        return count;
     }
 
 

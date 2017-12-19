@@ -10,7 +10,7 @@ public class Battle {
     while(nextTurn(bm, bm.getCurrentPlayer().makeAShot(p,bm.getCurrentEnemy())));
     *
     * */
-    public static boolean nextTurn(BattleManager bm, Point madeShot){
+    /*public static boolean nextTurn(BattleManager bm, Point madeShot){
         boolean isDead = checkTheField(madeShot, bm.getCurrentEnemy());
         if(isDead)
             shipIsDead(bm.getCurrentEnemy());
@@ -18,9 +18,9 @@ public class Battle {
             bm.nextTurn();
 
         return  !isFinished(bm);
-    }
+    }*/
 
-    private static void shipIsDead(Player player){
+    public static void shipIsDead(Player player){
         player.myShipIsDead();
         int[][] ships = player.ships();
         for (int i=1; i<11; i++)
@@ -39,7 +39,7 @@ public class Battle {
             }
     }
     // метод проверки сделанного выстрела на предмет убийства
-    private static boolean checkTheField(Point shot, Player player){
+    public static boolean checkTheField(Point shot, Player player){
         player.iWasShot(shot);
         int[][] ships = player.ships();
         switch (ships[shot.x][shot.y]){
@@ -166,9 +166,11 @@ public class Battle {
         return false;
     }
     // признак конца игры
-    private static boolean isFinished(BattleManager bm){
-        if (bm.getPlayers()[0].getCountOfShips()==0 || bm.getPlayers()[1].getCountOfShips()==0)
-            return true;
-        return false;
+    public static int isFinished(BattleManager bm){
+        if (bm.getPlayers()[0].getCountOfShips()==0)
+            return 1;
+        if (bm.getPlayers()[1].getCountOfShips()==0)
+            return 2;
+        return 0;
     }
 }
