@@ -166,15 +166,18 @@ public class Server {
                 return;
             }
 
-            //запрос о начале игры с ИИ
+            //запрос о начале игры с ИИ и отсылка, кто первый должен ходить
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/runGame") == 0)
             {
+                //записываем в строку пришедший запрос
                 InputStream inputStream = exchange.getRequestBody();
                 String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
 
+                //узнаем логин игрока
                 int index = inputStreamString.lastIndexOf("login");
                 String login = Parse.getValue(inputStreamString, index);
 
+                //ищем нужную нам игру
                 for (int i = 0; i < games.size(); i++)
                 {
                     if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0)
@@ -189,22 +192,27 @@ public class Server {
 
             }
 
+            //получение запроса с выстрелом пользователя при игре с ИИ
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/sendShotAI") == 0)
             {
+                //записываем в строку пришедший запрос
                 InputStream inputStream = exchange.getRequestBody();
                 String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
 
+                //узнаем логин игрока
                 int index = inputStreamString.lastIndexOf("login");
                 String login = Parse.getValue(inputStreamString, index);
 
+                //записываем координату выстрела в строку
                 index = inputStreamString.lastIndexOf("shot");
                 String shot = Parse.getValue(inputStreamString,index);
-                int ind = 0;
+
 
                 for (int i = 0; i < games.size(); i++)
                 {
                     if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0)
                     {
+                        //проверям, закончилась ли игра и проиграл ли в таком случае первый игрок
                         if(Battle.isFinished(games.get(i)) == 1)
                         {
                             String response = "lose=!one!";
@@ -213,6 +221,7 @@ public class Server {
                             return;
                         }
 
+                        //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
                         if(Battle.isFinished(games.get(i)) == 2)
                         {
                             String response = "lose=!two!";
@@ -220,23 +229,26 @@ public class Server {
                             sendResponce(exchange, response.getBytes());
                             return;
                         }
+
                         int[][] shipAI;
                         int[][] shipPlayer;
-                        int count = 0;
+                        Point p;
 
+                        //получаем количество убитых/ранненых кораблей ИИ до выстрела пользователя
+                        int count = 0;
                         shipAI = games.get(i).getPlayers()[1].getShipsForClient();
                         count = checkTurn(shipAI);
 
-                        Point p;
-                        ind = i;
+                        //выстрел пользователя
                         p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot),games.get(i).getCurrentEnemy());
 
+                        //проверяем, убит ли корабль после выстрела
                         boolean isDead = Battle.checkTheField(p,games.get(i).getCurrentEnemy());
-
                         if (isDead) {
                             Battle.shipIsDead(games.get(i).getCurrentEnemy());
                         }
 
+                        //получаем количество убитых/ранненых кораблей ИИ после выстрела пользователя
                         int newCount = 0;
                         shipAI = games.get(i).getPlayers()[1].getShipsForClient();
                         newCount = checkTurn(shipAI);
@@ -246,71 +258,99 @@ public class Server {
                         if (newCount > count && games.get(i).getTurn() == 0)
                         {
                             //запись кораблей в матрицы
-                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
-                            shipAI = games.get(ind).getPlayers()[1].getShipsForClient();
+                            shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
+                            shipAI = games.get(i).getPlayers()[1].getShipsForClient();
 
                             //запись двух матриц с кораблями в json файл
-                            Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(ind).getPlayers()[1].getLogin());
+                            Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
                             String response = "1";
                             sendResponce(exchange, response.getBytes());
                             return;
-                        } else
+                        }
+                        //если пользователь промахнулся, то стреляет ИИ
+                        else
                         {
+                            //меняем очередность хода
                             games.get(i).nextTurn();
-                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
+
+                            //получаем количество убитых/ранненых кораблей пользователя до выстрела ИИ
+                            shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
                             count = checkTurn(shipPlayer);
+
+                            //выстрел ИИ
                             p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot), games.get(i).getCurrentEnemy());
 
+                            //проверяем, убит ли корабль после выстрела
                             isDead = Battle.checkTheField(p, games.get(i).getCurrentEnemy());
-
+                            //если да, то он заполняется нулями
                             if (isDead) {
                                 Battle.shipIsDead(games.get(i).getCurrentEnemy());
                             }
 
-                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
+                            //получаем количество убитых/ранненых кораблей пользователя после выстрела ИИ
+                            shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
                             newCount = checkTurn(shipPlayer);
                         }
+
+                        //если ИИ попал, то он продолжает стрелять
                         if (newCount > count && games.get(i).getTurn() == 1)
                         {
+                            //в эту строку будут записываться координаты выстрелов ИИ
                             String shots = "";
                             int countShots = 0;
 
+                            //ИИ стреляет до момента, пока количество убитых/раненных кораблей до выстрела не совпадает с их количеством после выстрела
                             while (newCount != count)
                             {
                                 count = newCount;
 
+                                //выстрел ИИ
                                 p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot), games.get(i).getCurrentEnemy());
+
+                                //добавляем в строку координаты выстрела
                                 countShots++;
                                 shots += "x" + countShots + "=!" + p.x + "!";
                                 shots += "y" + countShots + "=!" + p.y + "!";
-                                isDead = Battle.checkTheField(p, games.get(i).getCurrentEnemy());
 
+                                //проверяем, убит ли корабль после выстрела
+                                isDead = Battle.checkTheField(p, games.get(i).getCurrentEnemy());
+                                //если да, то он заполняется нулями
                                 if (isDead) {
                                     Battle.shipIsDead(games.get(i).getCurrentEnemy());
                                 }
 
-                                shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
+                                //получаем количество убитых/ранненых кораблей пользователя после выстрела ИИ
+                                shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
                                 newCount = checkTurn(shipPlayer);
 
                             }
-                            games.get(i).nextTurn();
-                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
-                            shipAI = games.get(ind).getPlayers()[1].getShipsForClient();
 
-                            //запись двух матриц с кораблями в json файл
-                            Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(ind).getPlayers()[1].getLogin());
+                            //меняем очередность хода
+                            games.get(i).nextTurn();
+
+                            //получение матриц текущего хода
+                            shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
+                            shipAI = games.get(i).getPlayers()[1].getShipsForClient();
+
+                            //запись двух матриц с кораблями текущего кода в json файл
+                            Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
                             String response = "1";
                             sendResponce(exchange, response.getBytes());
                             return;
                         }
-                        else {
-                            games.get(i).nextTurn();
-                            //запись кораблей в матрицы
-                            shipPlayer = games.get(ind).getPlayers()[0].getShipsForClient();
-                            shipAI = games.get(ind).getPlayers()[1].getShipsForClient();
 
-                            //запись двух матриц с кораблями в json файл
-                            Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(ind).getPlayers()[1].getLogin());
+                        //если ИИ промахнулся
+                        else {
+
+                            //меняем очередность хода
+                            games.get(i).nextTurn();
+
+                            //получение матриц текущего хода
+                            shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
+                            shipAI = games.get(i).getPlayers()[1].getShipsForClient();
+
+                            //запись двух матриц с кораблями текущего кода в json файл
+                            Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
                             String response = "1";
                             sendResponce(exchange, response.getBytes());
                         }
