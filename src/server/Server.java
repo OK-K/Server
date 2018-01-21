@@ -6,6 +6,7 @@ import com.sun.net.httpserver.*;
 
 import java.awt.*;
 import java.io.*;
+import java.net.BindException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -16,6 +17,7 @@ import java.util.Scanner;
 
 public class Server {
 
+    //доступные расширения файлов, которые сервер поддерживает для отправки
     private static final Map<String, String> extensions = new HashMap<String, String>(){
         {
             put("html", "text/html");
@@ -30,42 +32,75 @@ public class Server {
 
         }
     };
-    public static String contentPath = "D://seaBattleServer";
-    private static ArrayList<String> usersName = new ArrayList<>();
-    public static ArrayList<BattleManager> games = new ArrayList<>();
-    public static HttpServer server;
-    public static boolean test = false;
 
+    //полный путь к файлам для отправки на клиент
+    public static String contentPath = "D://seaBattleServer";
+
+    //динамический массив с именами авторизованных игроков
+    private static ArrayList<String> usersName = new ArrayList<>();
+
+    //динамический массив с текущими играми
+    private static ArrayList<BattleManager> games = new ArrayList<>();
+
+    //объект встроенного http сервера
+    private static HttpServer server;
+
+    //количество игроков, которые ожидают игру с другими игроками
+    private static int waitingPlayers = 0;
+
+    //точка входа в приложение
     public static void main(String[] args) throws IOException {
         createMainMenu();
     }
 
-    public static void createMainMenu() throws IOException {
+    //статический метод создания консольного меню приложения
+    private static void createMainMenu() throws IOException {
         Scanner in = new Scanner(System.in);
         System.out.println("Welcome to the server management panel!");
         System.out.println("Available commands:");
         System.out.println("       - start");
         System.out.println("       - stop");
+        System.out.println("       - users");
+        System.out.println("       - games");
         System.out.print("enter command: ");
         String choose = in.next();
-        switch (choose)
+
+        try {
+            switch (choose) {
+                case "start": {
+                    String ip = startServer();
+                    System.out.println("Server successfully started");
+                    System.out.println("server ip address: " + ip);
+                    createMainMenu();
+                }
+                case "stop": {
+                    server.stop(2);
+                    System.out.println("Server successfully stopped");
+                    createMainMenu();
+                }
+                case "users": {
+                    System.out.println("Authorized Users: " + usersName.size());
+                    createMainMenu();
+                }
+                case "games": {
+                    System.out.println("Current games : " + games.size());
+                    createMainMenu();
+                }
+
+            }
+        } catch (NullPointerException e)
         {
-            case "start":
-            {
-                String ip = startServer();
-                System.out.println("Server successfully started");
-                System.out.println("server ip adress: " + ip);
-                createMainMenu();
-            }
-            case "stop":
-            {
-                server.stop(3);
-                createMainMenu();
-            }
+            System.out.println("Server not started!");
+            createMainMenu();
+        } catch (BindException e)
+        {
+            System.out.println("Server already started!");
+            createMainMenu();
         }
     }
 
-    public static String startServer() throws IOException {
+    //статический метод запуска сервера с ip адресом в локальной сети
+    private static String startServer() throws IOException {
         String ip_adress = Inet4Address.getLocalHost().getHostAddress();
         server = HttpServer.create(new InetSocketAddress(InetAddress.getByName(ip_adress), 80), 10);
         HttpContext context = server.createContext("/", new EchoHandler());
@@ -74,7 +109,8 @@ public class Server {
         return ip_adress;
     }
 
-    public static void processingRequest(HttpExchange exchange) throws IOException, InterruptedException {
+    //статический метод обработки запросов с клиента
+    private static void processingRequest(HttpExchange exchange) throws IOException, InterruptedException {
 
         int start = 0;
         String url = exchange.getRequestURI().toString();
@@ -109,6 +145,35 @@ public class Server {
             }
         } else
         {
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/changeShips") == 0)
+            {
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                //ищем нужную нам игру
+                for (int i = 0; i < games.size(); i++)
+                {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0)
+                    {
+                        String response = "1";
+                        sendResponce(exchange,response.getBytes());
+                        games.get(i).getPlayers()[0].arrangeShipsRandom();
+                        int[][] shipPlayer = games.get(games.size() - 1).getPlayers()[0].getShipsForClient();
+                        int[][] shipAI = games.get(games.size() - 1).getPlayers()[1].getShipsForClient();
+
+                        //запись двух матриц с кораблями в json файл
+                        Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(games.size() - 1).getPlayers()[1].getLogin());
+                        response = "1";
+                        sendResponce(exchange,response.getBytes());
+                        break;
+                    }
+                }
+            }
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/sendLogin") == 0)
             {
                 String response = "1";
@@ -208,13 +273,11 @@ public class Server {
                 String shot = Parse.getValue(inputStreamString,index);
 
 
-                for (int i = 0; i < games.size(); i++)
-                {
-                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0)
-                    {
-                        //проверям, закончилась ли игра и проиграл ли в таком случае первый игрок
-                        if(Battle.isFinished(games.get(i)) == 1)
-                        {
+                for (int i = 0; i < games.size(); i++) {
+                    try {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0) {
+                        //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
+                        if (Battle.isFinished(games.get(i)) == 1) {
                             String response = "lose=!one!";
                             games.remove(i);
                             sendResponce(exchange, response.getBytes());
@@ -222,8 +285,7 @@ public class Server {
                         }
 
                         //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
-                        if(Battle.isFinished(games.get(i)) == 2)
-                        {
+                        if (Battle.isFinished(games.get(i)) == 2) {
                             String response = "lose=!two!";
                             games.remove(i);
                             sendResponce(exchange, response.getBytes());
@@ -240,10 +302,10 @@ public class Server {
                         count = checkTurn(shipAI);
 
                         //выстрел пользователя
-                        p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot),games.get(i).getCurrentEnemy());
+                        p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot), games.get(i).getCurrentEnemy());
 
                         //проверяем, убит ли корабль после выстрела
-                        boolean isDead = Battle.checkTheField(p,games.get(i).getCurrentEnemy());
+                        boolean isDead = Battle.checkTheField(p, games.get(i).getCurrentEnemy());
                         if (isDead) {
                             Battle.shipIsDead(games.get(i).getCurrentEnemy());
                         }
@@ -255,8 +317,7 @@ public class Server {
 
 
                         //если пользователь попал, то он продолжает стрелять
-                        if (newCount > count && games.get(i).getTurn() == 0)
-                        {
+                        if (newCount > count && games.get(i).getTurn() == 0) {
                             //запись кораблей в матрицы
                             shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
                             shipAI = games.get(i).getPlayers()[1].getShipsForClient();
@@ -268,8 +329,7 @@ public class Server {
                             return;
                         }
                         //если пользователь промахнулся, то стреляет ИИ
-                        else
-                        {
+                        else {
                             //меняем очередность хода
                             games.get(i).nextTurn();
 
@@ -293,15 +353,13 @@ public class Server {
                         }
 
                         //если ИИ попал, то он продолжает стрелять
-                        if (newCount > count && games.get(i).getTurn() == 1)
-                        {
+                        if (newCount > count && games.get(i).getTurn() == 1) {
                             //в эту строку будут записываться координаты выстрелов ИИ
                             String shots = "";
                             int countShots = 0;
 
                             //ИИ стреляет до момента, пока количество убитых/раненных кораблей до выстрела не совпадает с их количеством после выстрела
-                            while (newCount != count)
-                            {
+                            while (newCount != count) {
                                 count = newCount;
 
                                 //выстрел ИИ
@@ -332,7 +390,7 @@ public class Server {
                             shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
                             shipAI = games.get(i).getPlayers()[1].getShipsForClient();
 
-                            //запись двух матриц с кораблями текущего кода в json файл
+                            //запись двух матриц с кораблями текущего хода в json файл
                             Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
                             String response = "1";
                             sendResponce(exchange, response.getBytes());
@@ -349,19 +407,85 @@ public class Server {
                             shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
                             shipAI = games.get(i).getPlayers()[1].getShipsForClient();
 
-                            //запись двух матриц с кораблями текущего кода в json файл
+                            //запись двух матриц с кораблями текущего хода в json файл
                             Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
                             String response = "1";
                             sendResponce(exchange, response.getBytes());
                         }
                     }
+                } catch (IllegalArgumentException e)
+                    {
+                        String response = "same";
+                        sendResponce(exchange, response.getBytes());
+                    }
+                    catch (IOException e)
+                    {
+                        String response = "errorJson";
+                        sendResponce(exchange, response.getBytes());
+                    }
                 }
+            }
+
+            //запрос изменения расстановки кораблей вручную
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/changeShipByPlayer") == 0)
+            {
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                int[][] newShips = new int[10][10];
+                int[][] shipAI;
+                int[][] shipPlayer;
+                for (int i = 0; i < 10; i++)
+                {
+                    for (int j = 0; j < 10; j++)
+                    {
+                        index = inputStreamString.indexOf(i + "_" + j);
+                        int deck = Integer.parseInt(Parse.getValue(inputStreamString, index));
+                        newShips[i][j] = deck;
+                    }
+                }
+                for (int i = 0; i < games.size(); i++) {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0) {
+                        games.get(i).getPlayers()[0].loadShips(newShips);
+                        //получение матриц текущего хода
+                        shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
+                        shipAI = games.get(i).getPlayers()[1].getShipsForClient();
+
+                        //запись двух матриц с кораблями текущего хода в json файл
+                        Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
+                        String response = "1";
+                        sendResponce(exchange, response.getBytes());
+                        break;
+                    }
+                }
+
+
+            }
+
+            //запрос от пользователя, который выбрал игру с пользователем и ожидает его
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/startWaitGame") == 0)
+            {
+                waitingPlayers++;
+
+                while (waitingPlayers < 2)
+                {
+
+                }
+
+                
+
             }
 
         }
 
     }
 
+    //слушатель запросов с клиента
     static class EchoHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -374,6 +498,7 @@ public class Server {
         }
     }
 
+    //статический метод, отправляющий запрос на клиент
     private static void sendResponce(HttpExchange exchange, byte[] buffer) throws IOException {
         exchange.sendResponseHeaders(200, buffer.length);
         OutputStream os = exchange.getResponseBody();
@@ -381,6 +506,7 @@ public class Server {
         os.close();
     }
 
+    //статический метод, подсчитывающий количество раннеых/убитых кораблей
     private static int checkTurn(int[][] ships)
     {
         int count = 0;
