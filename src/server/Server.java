@@ -10,6 +10,7 @@ import java.net.BindException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,8 +46,8 @@ public class Server {
     //объект встроенного http сервера
     private static HttpServer server;
 
-    //количество игроков, которые ожидают игру с другими игроками
-    private static int waitingPlayers = 0;
+    //динамический массив игроков, которые ожидают игру с другими игроками
+    private static  ArrayList<String> waitingPlayers = new ArrayList<>();
 
     //точка входа в приложение
     public static void main(String[] args) throws IOException {
@@ -231,6 +232,102 @@ public class Server {
                 return;
             }
 
+
+            //запрос о проверки файла сохраненной игры
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/checkSave") == 0)
+            {
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                File myFile = new File(Server.contentPath + "//json","save_" + login +".json");
+
+                int[][] newShips = new int[10][10];
+                int[][] newShipsAI = new int[10][10];
+                if(myFile.exists()) {
+                    FileReader fr = new FileReader(myFile);
+                    BufferedReader br = new BufferedReader(fr);
+
+                    String ship = br.readLine();
+                    ship = br.readLine();
+                    ship = br.readLine();
+
+                    for (int i = 0; i < 10; i++)
+                    {
+                        for (int j = 0; j < 10; j++)
+                        {
+                            index = ship.indexOf(i + "_" + j);
+                            int deck = Integer.parseInt(Parse.getValue(ship, index));
+                            newShips[i][j] = deck;
+                        }
+                    }
+
+                    index = ship.indexOf("lvl");
+                    int lvl = Integer.parseInt(Parse.getValue(ship, index));
+
+
+
+                    for (int i = 0; i < 10; i++)
+                    {
+                        for (int j = 0; j < 10; j++)
+                        {
+                            index = ship.lastIndexOf(i + "_" + j);
+                            int deck = Integer.parseInt(Parse.getValue(ship, index));
+                            newShipsAI[i][j] = deck;
+                        }
+                    }
+
+
+
+                    games.add(new BattleManager(login, lvl));
+                    games.get(games.size() - 1).getPlayers()[0].loadShips(newShips);
+                    games.get(games.size() - 1).getPlayers()[1].loadShips(newShipsAI);
+
+                    String response = "1";
+                    sendResponce(exchange,response.getBytes());
+                } else
+                {
+                    String response = "2";
+                    sendResponce(exchange,response.getBytes());
+                }
+            }
+            //запрос о сохранении игры с ИИ
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/saveGame") == 0)
+            {
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                //ищем нужную нам игру
+                for (int i = 0; i < games.size(); i++)
+                {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0) {
+                        int[][] shipEnemy;
+                        int[][] shipPlayer;
+                        shipEnemy = games.get(i).getPlayers()[1].getShipsForClient();
+                        shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
+                        int lvl = 0;
+                        String nameAI = games.get(i).getPlayers()[1].getLogin();
+                        if (nameAI.compareTo("Вице-адмирал Трайон") == 0)
+                            lvl = 1;
+                        if (nameAI.compareTo("Адмирал Микель де Рюйтер") == 0)
+                            lvl = 2;
+                        if (nameAI.compareTo("Адмирал Павел Нахимов") == 0)
+                            lvl = 3;
+                        Json.saveJsonFilePlayerWithAI(shipPlayer,shipEnemy,login,games.get(i).getPlayers()[1].getLogin(),lvl);
+                        String response = "1";
+                        sendResponce(exchange,response.getBytes());
+                    }
+                }
+            }
             //запрос о начале игры с ИИ и отсылка, кто первый должен ходить
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/runGame") == 0)
             {
@@ -257,6 +354,252 @@ public class Server {
 
             }
 
+            //запрос о начале игры с другим игроком и отсылка, кто первый должен ходить
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/runGameWithPlayer") == 0)
+            {
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                int count = 0;
+                for (int i = 0; i < waitingPlayers.size(); i++)
+                {
+                    if (waitingPlayers.get(i).compareTo(login) == 0)
+                        count++;
+                }
+                if (count > 0) {
+                    count = 0;
+                } else  waitingPlayers.add(login);
+                //ищем нужную нам игру
+                for (int i = 0; i < games.size(); i++)
+                {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0)
+                    {
+                        for (int j = 0; j < waitingPlayers.size(); j++)
+                        {
+                            if (waitingPlayers.get(j).compareTo(games.get(i).getPlayers()[1].getLogin()) == 0)
+                            {
+                                //waitingPlayers.remove(waitingPlayers.get(waitingPlayers.size() - 1));
+                                //waitingPlayers.remove(j);
+                                String response = "1";
+                                sendResponce(exchange,response.getBytes());
+                            }
+                        }
+
+                        //games.get(i).playTheGame();
+
+                    } else if (games.get(i).getPlayers()[1].getLogin().compareTo(login) == 0)
+                    {
+                        for (int j = 0; j < waitingPlayers.size(); j++)
+                        {
+                            if (waitingPlayers.get(j).compareTo(games.get(i).getPlayers()[0].getLogin()) == 0)
+                            {
+                                //waitingPlayers.remove(waitingPlayers.get(waitingPlayers.size() - 1));
+                                //waitingPlayers.remove(j);
+                                String response = "1";
+                                sendResponce(exchange,response.getBytes());
+                            }
+                        }
+                    }
+                }
+
+
+            }
+
+            //получание запроса о текущем ходе - кто должен ходить
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/getTurn") == 0)
+            {
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                for (int i = 0; i < games.size(); i++) {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0) {
+                        int turn = games.get(i).getTurn();
+                        if (turn == 0)
+                        {
+                            String response = "0";
+                            sendResponce(exchange, response.getBytes());
+                            return;
+                        } else {String response = "1";
+                            sendResponce(exchange, response.getBytes());
+                            return;}
+                    } else  if (games.get(i).getPlayers()[1].getLogin().compareTo(login) == 0) {
+                        int turn = games.get(i).getTurn();
+                        if (turn == 1)
+                        {
+                            String response = "0";
+                            sendResponce(exchange, response.getBytes());
+                            return;
+                        } else {String response = "1";
+                            sendResponce(exchange, response.getBytes());
+                            return;}
+                    }
+
+                }
+            }
+
+
+            //получение запроса с выстрелом игрока при игре с другим игроком
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/sendShotPlayer") == 0) {
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                //записываем координату выстрела в строку
+                index = inputStreamString.lastIndexOf("shot");
+                String shot = Parse.getValue(inputStreamString, index);
+
+                for (int i = 0; i < games.size(); i++) {
+                    try {
+                        if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0) {
+                            int[][] shipEnemy;
+                            int[][] shipPlayer;
+                            Point p;
+
+                            //получаем количество убитых/ранненых кораблей ИИ до выстрела пользователя
+                            int count = 0;
+                            shipEnemy = games.get(i).getPlayers()[1].getShipsForClient();
+                            count = checkTurn(shipEnemy);
+
+                            //выстрел пользователя
+                            p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot), games.get(i).getCurrentEnemy());
+
+                            //проверяем, убит ли корабль после выстрела
+                            boolean isDead = Battle.checkTheField(p, games.get(i).getCurrentEnemy());
+                            if (isDead) {
+                                Battle.shipIsDead(games.get(i).getCurrentEnemy());
+                            }
+
+                            //получаем количество убитых/ранненых кораблей ИИ после выстрела пользователя
+                            int newCount = 0;
+                            shipEnemy = games.get(i).getPlayers()[1].getShipsForClient();
+                            newCount = checkTurn(shipEnemy);
+
+                            //если пользователь попал, то он продолжает стрелять
+                            if (newCount > count && games.get(i).getTurn() == 0) {
+                                //запись кораблей в матрицы
+                                shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
+                                shipEnemy = games.get(i).getPlayers()[1].getShipsForClient();
+
+                                //запись двух матриц с кораблями в json файл
+                                Json.createJsonFilePlayerWithAI(shipPlayer, shipEnemy, login, games.get(i).getPlayers()[1].getLogin());
+                                String response = "1";
+
+                                //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
+                                if (Battle.isFinished(games.get(i)) == 1) {
+                                    response = "lose=!one!";
+                                    games.remove(i);
+                                    sendResponce(exchange, response.getBytes());
+                                    return;
+                                }
+
+                                //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
+                                if (Battle.isFinished(games.get(i)) == 2) {
+                                    response = "lose=!two!";
+                                    games.remove(i);
+                                    sendResponce(exchange, response.getBytes());
+                                    return;
+                                }
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
+                            //если пользователь промахнулся, то стреляет ИИ
+                            else {
+                                //меняем очередность хода
+                                games.get(i).nextTurn();
+                                String response = "2";
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
+
+                        }
+
+
+                        if (games.get(i).getPlayers()[1].getLogin().compareTo(login) == 0) {
+                            int[][] shipEnemy;
+                            int[][] shipPlayer;
+                            Point p;
+
+                            //получаем количество убитых/ранненых кораблей ИИ до выстрела пользователя
+                            int count = 0;
+                            shipEnemy = games.get(i).getPlayers()[0].getShipsForClient();
+                            count = checkTurn(shipEnemy);
+
+                            //выстрел пользователя
+                            p = games.get(i).getCurrentPlayer().makeAShot(Parse.getShotPoint(shot), games.get(i).getCurrentEnemy());
+
+                            //проверяем, убит ли корабль после выстрела
+                            boolean isDead = Battle.checkTheField(p, games.get(i).getCurrentEnemy());
+                            if (isDead) {
+                                Battle.shipIsDead(games.get(i).getCurrentEnemy());
+                            }
+
+                            //получаем количество убитых/ранненых кораблей ИИ после выстрела пользователя
+                            int newCount = 0;
+                            shipEnemy = games.get(i).getPlayers()[0].getShipsForClient();
+                            newCount = checkTurn(shipEnemy);
+
+                            //если пользователь попал, то он продолжает стрелять
+                            if (newCount > count && games.get(i).getTurn() == 0) {
+                                //запись кораблей в матрицы
+                                shipPlayer = games.get(i).getPlayers()[1].getShipsForClient();
+                                shipEnemy = games.get(i).getPlayers()[0].getShipsForClient();
+
+                                //запись двух матриц с кораблями в json файл
+                                Json.createJsonFilePlayerWithAI(shipPlayer, shipEnemy, login, games.get(i).getPlayers()[0].getLogin());
+                                String response = "1";
+
+                                //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
+                                if (Battle.isFinished(games.get(i)) == 1) {
+                                    response = "lose=!one!";
+                                    games.remove(i);
+                                    sendResponce(exchange, response.getBytes());
+                                    return;
+                                }
+
+                                //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
+                                if (Battle.isFinished(games.get(i)) == 2) {
+                                    response = "lose=!two!";
+                                    games.remove(i);
+                                    sendResponce(exchange, response.getBytes());
+                                    return;
+                                }
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
+                            //если пользователь промахнулся, то стреляет ИИ
+                            else {
+                                //меняем очередность хода
+                                games.get(i).nextTurn();
+                                String response = "2";
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
+
+                        }
+
+
+                    } catch (IllegalArgumentException e)
+                    {
+                        String response = "same";
+                        sendResponce(exchange, response.getBytes());
+                    }
+                }
+            }
+
             //получение запроса с выстрелом пользователя при игре с ИИ
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/sendShotAI") == 0)
             {
@@ -276,21 +619,7 @@ public class Server {
                 for (int i = 0; i < games.size(); i++) {
                     try {
                     if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0) {
-                        //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
-                        if (Battle.isFinished(games.get(i)) == 1) {
-                            String response = "lose=!one!";
-                            games.remove(i);
-                            sendResponce(exchange, response.getBytes());
-                            return;
-                        }
 
-                        //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
-                        if (Battle.isFinished(games.get(i)) == 2) {
-                            String response = "lose=!two!";
-                            games.remove(i);
-                            sendResponce(exchange, response.getBytes());
-                            return;
-                        }
 
                         int[][] shipAI;
                         int[][] shipPlayer;
@@ -309,7 +638,21 @@ public class Server {
                         if (isDead) {
                             Battle.shipIsDead(games.get(i).getCurrentEnemy());
                         }
+                        //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
+                        if (Battle.isFinished(games.get(i)) == 1) {
+                            String response = "lose=!one!";
+                            games.remove(i);
+                            sendResponce(exchange, response.getBytes());
+                            return;
+                        }
 
+                        //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
+                        if (Battle.isFinished(games.get(i)) == 2) {
+                            String response = "lose=!two!";
+                            games.remove(i);
+                            sendResponce(exchange, response.getBytes());
+                            return;
+                        }
                         //получаем количество убитых/ранненых кораблей ИИ после выстрела пользователя
                         int newCount = 0;
                         shipAI = games.get(i).getPlayers()[1].getShipsForClient();
@@ -325,6 +668,21 @@ public class Server {
                             //запись двух матриц с кораблями в json файл
                             Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
                             String response = "1";
+                            //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
+                            if (Battle.isFinished(games.get(i)) == 1) {
+                                response = "lose=!one!";
+                                games.remove(i);
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
+
+                            //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
+                            if (Battle.isFinished(games.get(i)) == 2) {
+                                response = "lose=!two!";
+                                games.remove(i);
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
                             sendResponce(exchange, response.getBytes());
                             return;
                         }
@@ -346,7 +704,21 @@ public class Server {
                             if (isDead) {
                                 Battle.shipIsDead(games.get(i).getCurrentEnemy());
                             }
+                            //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
+                            if (Battle.isFinished(games.get(i)) == 1) {
+                                String response = "lose=!one!";
+                                games.remove(i);
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
 
+                            //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
+                            if (Battle.isFinished(games.get(i)) == 2) {
+                                String response = "lose=!two!";
+                                games.remove(i);
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
                             //получаем количество убитых/ранненых кораблей пользователя после выстрела ИИ
                             shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
                             newCount = checkTurn(shipPlayer);
@@ -393,6 +765,21 @@ public class Server {
                             //запись двух матриц с кораблями текущего хода в json файл
                             Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
                             String response = "1";
+                            //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
+                            if (Battle.isFinished(games.get(i)) == 1) {
+                                response = "lose=!one!";
+                                games.remove(i);
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
+
+                            //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
+                            if (Battle.isFinished(games.get(i)) == 2) {
+                                response = "lose=!two!";
+                                games.remove(i);
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
                             sendResponce(exchange, response.getBytes());
                             return;
                         }
@@ -410,6 +797,21 @@ public class Server {
                             //запись двух матриц с кораблями текущего хода в json файл
                             Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
                             String response = "1";
+                            //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
+                            if (Battle.isFinished(games.get(i)) == 1) {
+                                response = "lose=!one!";
+                                games.remove(i);
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
+
+                            //проверям, закончилась ли игра и проиграл ли в таком случае второй игрок
+                            if (Battle.isFinished(games.get(i)) == 2) {
+                                response = "lose=!two!";
+                                games.remove(i);
+                                sendResponce(exchange, response.getBytes());
+                                return;
+                            }
                             sendResponce(exchange, response.getBytes());
                         }
                     }
@@ -461,6 +863,19 @@ public class Server {
                         String response = "1";
                         sendResponce(exchange, response.getBytes());
                         break;
+                    } else if (games.get(i).getPlayers()[1].getLogin().compareTo(login) == 0)
+                    {
+                        games.get(i).getPlayers()[1].loadShips(newShips);
+
+                        //получение матриц текущего хода
+                        shipPlayer = games.get(i).getPlayers()[1].getShipsForClient();
+                        shipAI = games.get(i).getPlayers()[0].getShipsForClient();
+
+                        //запись двух матриц с кораблями текущего хода в json файл
+                        Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(i).getPlayers()[1].getLogin());
+                        String response = "1";
+                        sendResponce(exchange, response.getBytes());
+                        break;
                     }
                 }
 
@@ -470,15 +885,154 @@ public class Server {
             //запрос от пользователя, который выбрал игру с пользователем и ожидает его
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/startWaitGame") == 0)
             {
-                waitingPlayers++;
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
 
-                while (waitingPlayers < 2)
-                {
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
 
+                for (int i = 0; i < waitingPlayers.size(); i++)
+                    if (waitingPlayers.get(i).compareTo(login) == 0 ) {
+                        String response = "1";
+                        sendResponce(exchange, response.getBytes());
+                        return;
+                    }
+
+                waitingPlayers.add(login);
+
+
+                String response = "1";
+                sendResponce(exchange, response.getBytes());
+
+            }
+
+            //запрос от пользователя о попытке начать игру с другим пользователем
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/startPlayerGame") == 0)
+            {
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+                for (int i = 0; i < games.size(); i++) {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0) {
+                        //если другой пользователь уже создал с этим пользователем игру
+
+                        int[][] shipPlayer = games.get(games.size() - 1).getPlayers()[0].getShipsForClient();
+                        int[][] shipPlayer2 = games.get(games.size() - 1).getPlayers()[1].getShipsForClient();
+                        Json.createJsonFilePlayerWithAI(shipPlayer, shipPlayer2, login, games.get(games.size() - 1).getPlayers()[0].getLogin());
+                        String response = "1";
+                        sendResponce(exchange, response.getBytes());
+                        return;
+                    } else if (games.get(i).getPlayers()[1].getLogin().compareTo(login) == 0)
+                    {
+                        int[][] shipPlayer = games.get(games.size() - 1).getPlayers()[1].getShipsForClient();
+                        int[][] shipPlayer2 = games.get(games.size() - 1).getPlayers()[0].getShipsForClient();
+                        Json.createJsonFilePlayerWithAI(shipPlayer, shipPlayer2, login, games.get(games.size() - 1).getPlayers()[1].getLogin());
+                        String response = "1";
+                        sendResponce(exchange, response.getBytes());
+                        return;
+                    }
                 }
 
-                
+                if (waitingPlayers.size() > 1)
+                {
+                    int indexlogin = 0;
+                    for (int i = 0; i < waitingPlayers.size(); i++)
+                        if (waitingPlayers.get(i).compareTo(login) != 0 )
+                            indexlogin = i;
+                    games.add(new BattleManager(login,waitingPlayers.get(indexlogin))); //создаем новую игру с другим игроком
+                    for (int i = 0; i < waitingPlayers.size(); i++)
+                        if (waitingPlayers.get(i).compareTo(login) == 0)
+                        {
+                            if (i > indexlogin)
+                            {
+                                waitingPlayers.remove(i);
+                                waitingPlayers.remove(indexlogin);
+                            }
+                            else
+                            {
+                                waitingPlayers.remove(indexlogin);
+                                waitingPlayers.remove(i);
+                            }
+                        }
+                    //запись кораблей в матрицы
+                    int[][] shipPlayer1 = games.get(games.size() - 1).getPlayers()[0].getShipsForClient();
+                    int[][] shipPlayer2 = games.get(games.size() - 1).getPlayers()[1].getShipsForClient();
 
+                    //запись двух матриц с кораблями в json файл
+                    Json.createJsonFilePlayerWithAI(shipPlayer1, shipPlayer2, login, games.get(games.size() - 1).getPlayers()[1].getLogin());
+                    String response = "1";
+                    sendResponce(exchange, response.getBytes());
+                } else
+                {
+                    String response = "0";
+                    sendResponce(exchange, response.getBytes());
+                }
+            }
+            if (httpMethod.compareTo("POST") == 0 && url.compareTo("/clearWaiting") == 0)
+            {
+                //записываем в строку пришедший запрос
+                InputStream inputStream = exchange.getRequestBody();
+                String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
+
+                //узнаем логин игрока
+                int index = inputStreamString.lastIndexOf("login");
+                String login = Parse.getValue(inputStreamString, index);
+
+                for (int i = 0; i < games.size(); i++)
+                {
+                    if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0)
+                    {
+                        for (int j = 0; j < waitingPlayers.size(); j++)
+                        {
+                            if (waitingPlayers.get(j).compareTo(games.get(i).getPlayers()[1].getLogin()) == 0)
+                            {
+                                for (int q = 0; q < waitingPlayers.size(); q++) {
+                                    if (waitingPlayers.get(q).compareTo(games.get(i).getPlayers()[0].getLogin()) == 0) {
+                                        if (q > j) {
+                                            waitingPlayers.remove(q);
+                                            waitingPlayers.remove(j);
+                                        } else {
+                                            waitingPlayers.remove(j);
+                                            waitingPlayers.remove(q);
+                                        }
+                                    }
+                                }
+                                String response = "1";
+                                sendResponce(exchange,response.getBytes());
+                            }
+                        }
+
+                        //games.get(i).playTheGame();
+
+                    } else if (games.get(i).getPlayers()[1].getLogin().compareTo(login) == 0)
+                    {
+                        for (int j = 0; j < waitingPlayers.size(); j++)
+                        {
+                            if (waitingPlayers.get(j).compareTo(games.get(i).getPlayers()[0].getLogin()) == 0)
+                            {
+                                for (int q = 0; q < waitingPlayers.size(); q++) {
+                                    if (waitingPlayers.get(q).compareTo(games.get(i).getPlayers()[1].getLogin()) == 0) {
+                                        if (q > j) {
+                                            waitingPlayers.remove(q);
+                                            waitingPlayers.remove(j);
+                                        } else {
+                                            waitingPlayers.remove(j);
+                                            waitingPlayers.remove(q);
+                                        }
+                                    }
+                                }
+                                String response = "1";
+                                sendResponce(exchange,response.getBytes());
+                            }
+                        }
+                    }
+                }
             }
 
         }
