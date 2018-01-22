@@ -469,7 +469,7 @@ public class Server {
                             int[][] shipPlayer;
                             Point p;
 
-                            //получаем количество убитых/ранненых кораблей ИИ до выстрела пользователя
+                            //получаем количество убитых/ранненых кораблей противника до выстрела пользователя
                             int count = 0;
                             shipEnemy = games.get(i).getPlayers()[1].getShipsForClient();
                             count = checkTurn(shipEnemy);
@@ -483,7 +483,7 @@ public class Server {
                                 Battle.shipIsDead(games.get(i).getCurrentEnemy());
                             }
 
-                            //получаем количество убитых/ранненых кораблей ИИ после выстрела пользователя
+                            //получаем количество убитых/ранненых кораблей противника после выстрела пользователя
                             int newCount = 0;
                             shipEnemy = games.get(i).getPlayers()[1].getShipsForClient();
                             newCount = checkTurn(shipEnemy);
@@ -496,6 +496,7 @@ public class Server {
 
                                 //запись двух матриц с кораблями в json файл
                                 Json.createJsonFilePlayerWithAI(shipPlayer, shipEnemy, login, games.get(i).getPlayers()[1].getLogin());
+                                Json.createJsonFilePlayerWithAI(shipEnemy, shipPlayer, games.get(i).getPlayers()[1].getLogin(), login);
                                 String response = "1";
 
                                 //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
@@ -516,8 +517,17 @@ public class Server {
                                 sendResponce(exchange, response.getBytes());
                                 return;
                             }
-                            //если пользователь промахнулся, то стреляет ИИ
+                            //если пользователь промахнулся, то стреляет другой игрок
                             else {
+
+                                //запись кораблей в матрицы
+                                shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
+                                shipEnemy = games.get(i).getPlayers()[1].getShipsForClient();
+
+                                //запись двух матриц с кораблями в json файл
+                                Json.createJsonFilePlayerWithAI(shipPlayer, shipEnemy, login, games.get(i).getPlayers()[1].getLogin());
+                                Json.createJsonFilePlayerWithAI(shipEnemy, shipPlayer, games.get(i).getPlayers()[1].getLogin(), login);
+
                                 //меняем очередность хода
                                 games.get(i).nextTurn();
                                 String response = "2";
@@ -533,7 +543,7 @@ public class Server {
                             int[][] shipPlayer;
                             Point p;
 
-                            //получаем количество убитых/ранненых кораблей ИИ до выстрела пользователя
+                            //получаем количество убитых/ранненых кораблей противника до выстрела пользователя
                             int count = 0;
                             shipEnemy = games.get(i).getPlayers()[0].getShipsForClient();
                             count = checkTurn(shipEnemy);
@@ -547,19 +557,20 @@ public class Server {
                                 Battle.shipIsDead(games.get(i).getCurrentEnemy());
                             }
 
-                            //получаем количество убитых/ранненых кораблей ИИ после выстрела пользователя
+                            //получаем количество убитых/ранненых кораблей противника после выстрела пользователя
                             int newCount = 0;
                             shipEnemy = games.get(i).getPlayers()[0].getShipsForClient();
                             newCount = checkTurn(shipEnemy);
 
                             //если пользователь попал, то он продолжает стрелять
-                            if (newCount > count && games.get(i).getTurn() == 0) {
+                            if (newCount > count && games.get(i).getTurn() == 1) {
                                 //запись кораблей в матрицы
                                 shipPlayer = games.get(i).getPlayers()[1].getShipsForClient();
                                 shipEnemy = games.get(i).getPlayers()[0].getShipsForClient();
 
                                 //запись двух матриц с кораблями в json файл
                                 Json.createJsonFilePlayerWithAI(shipPlayer, shipEnemy, login, games.get(i).getPlayers()[0].getLogin());
+                                Json.createJsonFilePlayerWithAI(shipEnemy, shipPlayer, games.get(i).getPlayers()[0].getLogin(), login);
                                 String response = "1";
 
                                 //проверяем, закончилась ли игра и проиграл ли в таком случае первый игрок
@@ -583,6 +594,14 @@ public class Server {
                             //если пользователь промахнулся, то стреляет ИИ
                             else {
                                 //меняем очередность хода
+
+                                //запись кораблей в матрицы
+                                shipPlayer = games.get(i).getPlayers()[1].getShipsForClient();
+                                shipEnemy = games.get(i).getPlayers()[0].getShipsForClient();
+
+                                //запись двух матриц с кораблями в json файл
+                                Json.createJsonFilePlayerWithAI(shipPlayer, shipEnemy, login, games.get(i).getPlayers()[0].getLogin());
+                                Json.createJsonFilePlayerWithAI(shipEnemy, shipPlayer, games.get(i).getPlayers()[0].getLogin(), login);
                                 games.get(i).nextTurn();
                                 String response = "2";
                                 sendResponce(exchange, response.getBytes());
