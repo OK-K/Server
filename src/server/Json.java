@@ -8,8 +8,8 @@ import java.io.IOException;
 
 public class Json {
 
-    public static void createJsonFilePlayerWithAI(int[][] shipPlayer, int[][] shipAI, String namePlayer, String nameAI) throws IOException {
-        String resultJson = "{\ngame:\n[" + createJsonFromMatr(shipPlayer,namePlayer) + "," + createJsonFromMatr(shipAI,nameAI) + "]}";
+    public static void createJsonFilePlayerWithAI(int[][] shipPlayer, int[][] shipAI, String namePlayer, String nameAI, int lvl) throws IOException {
+        String resultJson = "{\ngame:\n[" + createJsonFromMatr(shipPlayer,namePlayer) + "," + createJsonFromMatr(shipAI,nameAI, lvl) + "]}";
         File fOutput = new File(Server.contentPath + "//json","new_" + namePlayer +".json");
         FileWriter fw = new FileWriter(fOutput);
         fw.write(resultJson);
