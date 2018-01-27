@@ -89,6 +89,8 @@ public class Server {
                 }
 
             }
+
+            //обработка исключений
         } catch (NullPointerException e)
         {
             System.out.println("Server not started!");
@@ -117,6 +119,7 @@ public class Server {
         String url = exchange.getRequestURI().toString();
         String httpMethod = exchange.getRequestMethod();
 
+        //отравка первой страницы авторизации
         if (httpMethod.compareTo("GET") == 0 && url.compareTo("/") == 0)
         {
             FileInputStream fis = new FileInputStream(contentPath + "//pages//login.html");
@@ -126,7 +129,9 @@ public class Server {
             return;
         }
 
+
         start = url.lastIndexOf('.');
+        //если запросили файл - то отправляем этот файл(при наличии)
         if (start > 0 && httpMethod.compareTo(("GET")) == 0)
         {
             String newUrl = url.replaceAll("/","//");
@@ -145,8 +150,11 @@ public class Server {
                     return;
                 }
             }
-        } else
+        }
+        //если запрашивают НЕ файл, то обрабатываем соответсвующую команду
+        else
         {
+            //запрос на случайную расстановку при игре с ИИ
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/changeShips") == 0)
             {
                 //записываем в строку пришедший запрос
@@ -163,12 +171,12 @@ public class Server {
                     if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0)
                     {
                         String response = "1";
-                        sendResponce(exchange,response.getBytes());
+                       // sendResponce(exchange,response.getBytes());
                         games.get(i).getPlayers()[0].arrangeShipsRandom();
                         int[][] shipPlayer = games.get(games.size() - 1).getPlayers()[0].getShipsForClient();
                         int[][] shipAI = games.get(games.size() - 1).getPlayers()[1].getShipsForClient();
 
-                        //запись двух матриц с кораблями в json файл
+                        //узнаем уровень сложности ИИ
                         int lvl = 0;
                         String nameAI = games.get(i).getPlayers()[1].getLogin();
                         if (nameAI.compareTo("Вице-адмирал Трайон") == 0)
@@ -177,6 +185,7 @@ public class Server {
                             lvl = 2;
                         if (nameAI.compareTo("Адмирал Павел Нахимов") == 0)
                             lvl = 3;
+                        //запись двух матриц с кораблями в json файл
                         Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(games.size() - 1).getPlayers()[1].getLogin(),lvl);
                         response = "1";
                         sendResponce(exchange,response.getBytes());
@@ -184,9 +193,12 @@ public class Server {
                     }
                 }
             }
+
+            //запрос авторизации
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/sendLogin") == 0)
             {
                 String response = "1";
+                //записываем в строку пришедший запрос
                 InputStream inputStream = exchange.getRequestBody();
                 String inputStreamString = new Scanner(inputStream,"UTF-8").useDelimiter("\\A").next();
 
@@ -207,19 +219,24 @@ public class Server {
                 return;
             }
 
-            //принимаем запрос, где пользователь выбирает среднюю сложность
+            //принимаем запрос, где пользователь выбирает сложность ИИ
             if (httpMethod.compareTo("POST") == 0 && url.compareTo("/sendComplexity") == 0)
             {
                 try {
+
+                    //записываем в строку пришедший запрос
                     InputStream inputStream = exchange.getRequestBody();
                     String inputStreamString = new Scanner(inputStream, "UTF-8").useDelimiter("\\A").next();
 
+                    //узнаем уровень сложности
                     int index = inputStreamString.lastIndexOf("level");
                     int lvl = Integer.parseInt(Parse.getValue(inputStreamString, index));
 
+                    //узнаем логин игрока
                     index = inputStreamString.lastIndexOf("login");
                     String login = Parse.getValue(inputStreamString, index);
 
+                    //создаем объект новой игры
                     games.add(new BattleManager(login, lvl)); //создаем новую игру с компьютером с соответсвующим уровнем сложности
 
                     //запись кораблей в матрицы
@@ -230,6 +247,7 @@ public class Server {
 
                     Json.createJsonFilePlayerWithAI(shipPlayer, shipAI, login, games.get(games.size() - 1).getPlayers()[1].getLogin(),lvl);
                     String response = "1";
+                    //отправляем ответ
                     sendResponce(exchange,response.getBytes());
 
                 }
@@ -237,6 +255,7 @@ public class Server {
                 catch (IOException e)
                 {
                     String response = "wrongWriteFile";
+                    //отправляем ответ
                     sendResponce(exchange,response.getBytes());
                 }
                 return;
@@ -258,7 +277,9 @@ public class Server {
 
                 int[][] newShips = new int[10][10];
                 int[][] newShipsAI = new int[10][10];
+                //если файл существует, то мы востанавливаем игру
                 if(myFile.exists()) {
+                    //далее считываем из файла json сохраненную матрицу и создаем новую игру с ней
                     FileReader fr = new FileReader(myFile);
                     BufferedReader br = new BufferedReader(fr);
 
@@ -277,7 +298,7 @@ public class Server {
                             newShips[i][j] = deck;
                         }
                     }
-
+                    //узнаем с каким уровнем сложности востанавливать
                     index = ship.indexOf("lvl");
                     int lvl = Integer.parseInt(Parse.getValue(ship, index));
 
@@ -294,12 +315,13 @@ public class Server {
                     }
 
 
-
+                    //восстанавливаем игру
                     games.add(new BattleManager(login, lvl));
                     games.get(games.size() - 1).getPlayers()[0].loadShips(newShips);
                     games.get(games.size() - 1).getPlayers()[1].loadShips(newShipsAI);
 
                     String response = "1";
+                    //отправка ответа
                     sendResponce(exchange,response.getBytes());
                 } else
                 {
@@ -324,6 +346,7 @@ public class Server {
                     if (games.get(i).getPlayers()[0].getLogin().compareTo(login) == 0) {
                         int[][] shipEnemy;
                         int[][] shipPlayer;
+                        //узнаем текущие матрицы и записываем их в файл сохранения
                         shipEnemy = games.get(i).getPlayers()[1].getShipsForClient();
                         shipPlayer = games.get(i).getPlayers()[0].getShipsForClient();
                         int lvl = 0;
@@ -334,8 +357,10 @@ public class Server {
                             lvl = 2;
                         if (nameAI.compareTo("Адмирал Павел Нахимов") == 0)
                             lvl = 3;
+                        //запись в json
                         Json.saveJsonFilePlayerWithAI(shipPlayer,shipEnemy,login,games.get(i).getPlayers()[1].getLogin(),lvl);
                         String response = "1";
+                        //отправка ответа
                         sendResponce(exchange,response.getBytes());
                     }
                 }
@@ -378,11 +403,13 @@ public class Server {
                 String login = Parse.getValue(inputStreamString, index);
 
                 int count = 0;
+                //проверяем - ожидает ли уже этот пользователь игры
                 for (int i = 0; i < waitingPlayers.size(); i++)
                 {
                     if (waitingPlayers.get(i).compareTo(login) == 0)
                         count++;
                 }
+                //еслли да, то мы не добавляем его в массив ожидающих игроков
                 if (count > 0) {
                     count = 0;
                 } else  waitingPlayers.add(login);
@@ -1154,8 +1181,8 @@ public class Server {
                             lvl = 2;
                         if (nameAI.compareTo("Адмирал Павел Нахимов") == 0)
                             lvl = 3;
-                        Json.createJsonFilePlayerWithAI(shipPlayer, shipPlayer2, login, games.get(games.size() - 1).getPlayers()[0].getLogin(),lvl);
-                        Json.createJsonFilePlayerWithAI(shipPlayer2, shipPlayer, games.get(games.size() - 1).getPlayers()[0].getLogin(),login,lvl );
+                        Json.createJsonFilePlayerWithAI(shipPlayer, shipPlayer2, login, games.get(games.size() - 1).getPlayers()[1].getLogin(),lvl);
+                        Json.createJsonFilePlayerWithAI(shipPlayer2, shipPlayer, games.get(games.size() - 1).getPlayers()[1].getLogin(),login,lvl );
                         String response = "1";
                         sendResponce(exchange, response.getBytes());
                         return;
@@ -1171,8 +1198,8 @@ public class Server {
                             lvl = 2;
                         if (nameAI.compareTo("Адмирал Павел Нахимов") == 0)
                             lvl = 3;
-                        Json.createJsonFilePlayerWithAI(shipPlayer, shipPlayer2, login, games.get(games.size() - 1).getPlayers()[1].getLogin(),lvl);
-                        Json.createJsonFilePlayerWithAI(shipPlayer2, shipPlayer, games.get(games.size() - 1).getPlayers()[1].getLogin(),login,lvl );
+                        Json.createJsonFilePlayerWithAI(shipPlayer, shipPlayer2, login, games.get(games.size() - 1).getPlayers()[0].getLogin(),lvl);
+                        Json.createJsonFilePlayerWithAI(shipPlayer2, shipPlayer, games.get(games.size() - 1).getPlayers()[0].getLogin(),login,lvl );
                         String response = "1";
                         sendResponce(exchange, response.getBytes());
                         return;
